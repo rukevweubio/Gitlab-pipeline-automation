@@ -23,6 +23,7 @@ test_job:
     - npm install
     - npm ci
   script:
+    - ls -l 
     - npm test
 
 # build_job:
