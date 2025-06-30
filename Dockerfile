@@ -10,7 +10,7 @@ COPY package*.json ./
 
 # Install dependencies
 # Using npm ci ensures clean installs and uses package-lock.json if present
-RUN npm ci
+RUN npm install
 
 # Copy the rest of the application code to the working directory
 # This includes server.js and the 'public' directory containing your game files
