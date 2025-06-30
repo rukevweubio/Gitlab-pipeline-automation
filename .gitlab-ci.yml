@@ -1,5 +1,5 @@
 workflow:
-  name: "Deploy a simple Node.js app to Docker Hub"
+  name: "Deploy a simple Node.js app to Docker Hub name "
   rules:
     - if: '$CI_COMMIT_REF_NAME =~ /^feature/'
 
