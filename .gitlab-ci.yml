@@ -1,0 +1,35 @@
+workflow:
+  name: "Deploy a simple Node.js app to Docker Hub"
+  rules:
+    - if: '$CI_COMMIT_REF_NAME =~ /^feature/'
+
+stages:
+  - test
+  - build 
+  - scan
+  - deploy
+
+variables:
+  DOCKER_IMAGE: nodejs-app
+  DOCKER_REGISTRY: docker.io
+  IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+  LATEST_TAG: $CI_REGISTRY_IMAGE:latest
+
+test_job:
+  stage: test
+  image: node:18  # Updated to newer version
+  before_script:
+    - echo "Installing Node.js dependencies"
+    - npm install
+    - npm ci
+  script:
+    - npm test
+
+# build_job:
+#   stage: build
+#   image: docker:latest
+#   services:
+#     - docker:dind
+#   script:
+#     - docker build -t $IMAGE_TAG .
+#     - docker tag $IMAGE_TAG $LATEST_TAG
