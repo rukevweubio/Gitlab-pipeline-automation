@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Road Runner Shooter</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a202c; /* Dark blue-gray */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+        canvas {
+            background-color: #2d3748; /* Darker blue-gray for road */
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+            display: block;
+            touch-action: none; /* Prevent default touch actions like scrolling */
+            outline: none; /* Remove focus outline */
+        }
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
+            padding: 1rem;
+        }
+        .info-panel {
+            background-color: #4a5568; /* Gray for info panel */
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            color: #e2e8f0; /* Light text */
+            font-weight: bold;
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 800px; /* Match canvas max width */
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+        .message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #2d3748; /* Darker blue-gray */
+            border: 2px solid #a0aec0; /* Light border */
+            padding: 2rem;
+            border-radius: 1rem;
+            text-align: center;
+            color: #e2e8f0;
+            font-size: 1.5rem;
+            font-weight: bold;
+            z-index: 1000;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.6);
+            display: none; /* Hidden by default */
+        }
+        .message-box button {
+            background-color: #48bb78; /* Green button */
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            margin-top: 1.5rem;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+        }
+        .message-box button:hover {
+            background-color: #38a169; /* Darker green on hover */
+            transform: translateY(-2px);
+        }
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            width: 100%;
+            max-width: 800px;
+        }
+        .control-button {
+            background-color: #4299e1; /* Blue button */
+            color: white;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            font-weight: bold;
+            transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            width: 100%;
+            max-width: 150px;
+            text-align: center;
+        }
+        .control-button:hover {
+            background-color: #3182ce; /* Darker blue on hover */
+            transform: translateY(-2px);
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="info-panel">
+            <span>Score: <span id="scoreDisplay">0</span></span>
+            <span>Health: <span id="healthDisplay">100</span></span>
+        </div>
+        <canvas id="gameCanvas"></canvas>
+        <div class="controls">
+            <button id="leftButton" class="control-button">&larr;</button>
+            <button id="shootButton" class="control-button">Fire</button>
+            <button id="rightButton" class="control-button">&rarr;</button>
+        </div>
+    </div>
+
+    <div id="messageBox" class="message-box">
+        <p id="messageText"></p>
+        <button id="restartButton">Play Again</button>
+    </div>
+
+    <script>
+        // Game variables
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const healthDisplay = document.getElementById('healthDisplay');
+        const messageBox = document.getElementById('messageBox');
+        const messageText = document.getElementById('messageText');
+        const restartButton = document.getElementById('restartButton');
+        const leftButton = document.getElementById('leftButton');
+        const shootButton = document.getElementById('shootButton');
+        const rightButton = document.getElementById('rightButton');
+
+        let player = {
+            x: 0,
+            y: 0,
+            width: 40,
+            height: 60,
+            speed: 5,
+            health: 100,
+            color: '#a78bfa' // Purple
+        };
+
+        let obstacles = [];
+        let projectiles = [];
+        let score = 0;
+        let gameRunning = false;
+        let lastObstacleSpawn = 0;
+        let obstacleSpawnInterval = 1000; // ms
+        let obstacleSpeed = 2; // Initial speed
+        let projectileSpeed = 7;
+        let projectileCooldown = 300; // ms
+        let lastShotTime = 0;
+
+        // Resize canvas to fit screen
+        function resizeCanvas() {
+            canvas.width = Math.min(window.innerWidth * 0.9, 800);
+            canvas.height = Math.min(window.innerHeight * 0.7, 600);
+            player.x = canvas.width / 2 - player.width / 2;
+            player.y = canvas.height - player.height - 30; // Position near bottom
+        }
+
+        // Initialize game
+        function initGame() {
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+            resetGame();
+            showMessageBox("Press START to play!", "Start Game", startGame);
+        }
+
+        // Reset game state
+        function resetGame() {
+            player.health = 100;
+            score = 0;
+            obstacles = [];
+            projectiles = [];
+            obstacleSpeed = 2;
+            obstacleSpawnInterval = 1000;
+            updateDisplay();
+        }
+
+        // Start the game loop
+        function startGame() {
+            gameRunning = true;
+            messageBox.style.display = 'none';
+            gameLoop();
+        }
+
+        // Game loop
+        function gameLoop(timestamp) {
+            if (!gameRunning) return;
+
+            // Update game state
+            update();
+            // Draw everything
+            draw();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Update game objects
+        function update() {
+            // Update obstacles
+            obstacles.forEach((obstacle, index) => {
+                obstacle.y += obstacleSpeed;
+
+                // Remove obstacles that are off-screen
+                if (obstacle.y > canvas.height) {
+                    obstacles.splice(index, 1);
+                    score += 10; // Score for dodging
+                }
+
+                // Check for collision with player
+                if (
+                    player.x < obstacle.x + obstacle.width &&
+                    player.x + player.width > obstacle.x &&
+                    player.y < obstacle.y + obstacle.height &&
+                    player.y + player.height > obstacle.y
+                ) {
+                    player.health -= 20; // Reduce health on collision
+                    obstacles.splice(index, 1); // Remove obstacle after collision
+                    if (player.health <= 0) {
+                        endGame();
+                    }
+                }
+            });
+
+            // Update projectiles
+            projectiles.forEach((projectile, pIndex) => {
+                projectile.y -= projectileSpeed;
+
+                // Remove projectiles that are off-screen
+                if (projectile.y < 0) {
+                    projectiles.splice(pIndex, 1);
+                }
+
+                // Check for collision with obstacles
+                obstacles.forEach((obstacle, oIndex) => {
+                    if (
+                        projectile.x < obstacle.x + obstacle.width &&
+                        projectile.x + projectile.width > obstacle.x &&
+                        projectile.y < obstacle.y + obstacle.height &&
+                        projectile.y + projectile.height > obstacle.y
+                    ) {
+                        obstacles.splice(oIndex, 1); // Remove obstacle
+                        projectiles.splice(pIndex, 1); // Remove projectile
+                        score += 20; // Score for shooting
+                    }
+                });
+            });
+
+            // Spawn new obstacles
+            const currentTime = performance.now();
+            if (currentTime - lastObstacleSpawn > obstacleSpawnInterval) {
+                spawnObstacle();
+                lastObstacleSpawn = currentTime;
+            }
+
+            // Increase difficulty over time
+            if (score > 0 && score % 100 === 0) {
+                obstacleSpeed = Math.min(obstacleSpeed + 0.1, 8); // Max speed 8
+                obstacleSpawnInterval = Math.max(obstacleSpawnInterval - 10, 300); // Min interval 300ms
+            }
+
+            updateDisplay();
+        }
+
+        // Draw all game objects
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear canvas
+
+            // Draw road lines (simple visual effect)
+            ctx.fillStyle = '#64748b'; // Gray-blue for lines
+            for (let i = 0; i < canvas.height; i += 50) {
+                ctx.fillRect(canvas.width / 2 - 5, (i + score * 0.1) % (canvas.height + 50) - 50, 10, 30);
+                ctx.fillRect(canvas.width / 4 - 5, (i + score * 0.1) % (canvas.height + 50) - 50, 10, 30);
+                ctx.fillRect(canvas.width * 3 / 4 - 5, (i + score * 0.1) % (canvas.height + 50) - 50, 10, 30);
+            }
+
+
+            // Draw player
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.width, player.height);
+
+            // Draw obstacles
+            ctx.fillStyle = '#ef4444'; // Red
+            obstacles.forEach(obstacle => {
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+
+            // Draw projectiles
+            ctx.fillStyle = '#facc15'; // Yellow
+            projectiles.forEach(projectile => {
+                ctx.fillRect(projectile.x, projectile.y, projectile.width, projectile.height);
+            });
+        }
+
+        // Spawn a new obstacle
+        function spawnObstacle() {
+            const obstacleWidth = 30 + Math.random() * 40;
+            const obstacleHeight = 30 + Math.random() * 40;
+            const x = Math.random() * (canvas.width - obstacleWidth);
+            obstacles.push({
+                x: x,
+                y: -obstacleHeight, // Start above canvas
+                width: obstacleWidth,
+                height: obstacleHeight,
+                color: 'red'
+            });
+        }
+
+        // Shoot a projectile
+        function shoot() {
+            const currentTime = performance.now();
+            if (currentTime - lastShotTime > projectileCooldown) {
+                projectiles.push({
+                    x: player.x + player.width / 2 - 5, // Center of player
+                    y: player.y,
+                    width: 10,
+                    height: 20,
+                    color: 'yellow'
+                });
+                lastShotTime = currentTime;
+            }
+        }
+
+        // Update score and health display
+        function updateDisplay() {
+            scoreDisplay.textContent = score;
+            healthDisplay.textContent = player.health;
+            healthDisplay.style.color = player.health < 50 ? '#ef4444' : '#48bb78'; // Red if low, green otherwise
+        }
+
+        // End game
+        function endGame() {
+            gameRunning = false;
+            messageText.textContent = `Game Over! Your Score: ${score}`;
+            messageBox.style.display = 'block';
+            restartButton.onclick = () => {
+                resetGame();
+                startGame();
+            };
+        }
+
+        // Show a generic message box
+        function showMessageBox(message, buttonText, buttonAction) {
+            messageText.textContent = message;
+            restartButton.textContent = buttonText;
+            restartButton.onclick = buttonAction;
+            messageBox.style.display = 'block';
+        }
+
+        // Event listeners for player movement and shooting
+        document.addEventListener('keydown', (e) => {
+            if (!gameRunning) return;
+            if (e.key === 'ArrowLeft' && player.x > 0) {
+                player.x -= player.speed;
+            } else if (e.key === 'ArrowRight' && player.x + player.width < canvas.width) {
+                player.x += player.speed;
+            } else if (e.key === ' ') { // Space bar for shooting
+                shoot();
+            }
+        });
+
+        // Mobile controls
+        leftButton.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameRunning) player.x = Math.max(0, player.x - player.speed * 5); });
+        rightButton.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameRunning) player.x = Math.min(canvas.width - player.width, player.x + player.speed * 5); });
+        shootButton.addEventListener('touchstart', (e) => { e.preventDefault(); if (gameRunning) shoot(); });
+
+        // Touch drag for player movement
+        let touchStartX = 0;
+        let playerDragStart = 0;
+
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent scrolling
+            if (e.touches.length === 1) {
+                touchStartX = e.touches[0].clientX;
+                playerDragStart = player.x;
+            }
+        });
+
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault(); // Prevent scrolling
+            if (e.touches.length === 1 && gameRunning) {
+                const touchCurrentX = e.touches[0].clientX;
+                const deltaX = touchCurrentX - touchStartX;
+                player.x = Math.max(0, Math.min(canvas.width - player.width, playerDragStart + deltaX));
+            }
+        });
+
+
+        // Initialize the game when the window loads
+        window.onload = initGame;
+    </script>
+</body>
+</html>
