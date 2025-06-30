@@ -1,5 +1,5 @@
 workflow:
-  name: "Deploy a simple Node.js app to Docker Hub name "
+  name: "Deploy a simple Node.js app to Docker Hub"
   rules:
     - if: '$CI_COMMIT_REF_NAME =~ /^feature/'
 
@@ -10,20 +10,15 @@ stages:
   - deploy
 
 variables:
-  DOCKER_IMAGE: nodejs-app
-  DOCKER_REGISTRY: docker.io
-  IMAGE_TAG: $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-  LATEST_TAG: $CI_REGISTRY_IMAGE:latest
-  docker_password: rukevweubio
-  docker_username: Comfort12345@
-  CS_REGISTRY_USER: $CI_REGISTRY_USER
-  CS_REGISTRY_PASSWORD: $CI_REGISTRY_PASSWORD
-
-
+  DOCKER_IMAGE_NAME: "nodejs-app"
+  DOCKER_REGISTRY: "docker.io"
+  DOCKER_USERNAME: "Comfort12345@"
+  DOCKER_PASSWORD: "rukevweubio"
+  IMAGE_TAG_SHORT: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:$CI_COMMIT_SHORT_SHA"
+  IMAGE_TAG_LATEST: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest"
 
 include:
   - template: Jobs/Container-Scanning.gitlab-ci.yml
-
 
 test_job:
   stage: test
@@ -31,58 +26,31 @@ test_job:
   before_script:
     - echo "Installing Node.js dependencies"
     - ls -l 
-    - mv Node.js server.js
+    - mv Node.js server.js || true # Only if needed; ensure this step is correct
     - npm install
     - npm ci
-
   script:
     - ls -l
     - npm test
 
-docker_deploy:
+docker_build_and_push:
   stage: build
   image: docker:latest
   services:
     - docker:dind
-  before_script:
-    - echo "Build the docker image to deploy the image"
   script:
-      - echo "Docker build the image and push it to Docker Hub"
-      - echo "$docker_password" | docker login -u "$docker_username" --password-stdin
-      - docker build -t $DOCKER_IMAGE .
-      - echo "The docker image built successfully"
-      - docker tag $DOCKER_IMAGE docker.io/$docker_username/$DOCKER_IMAGE:latest
-      - docker save $DOCKER_IMAGE > docker_image.tar
-      - echo "The docker image saved successfully"
+    - echo "Logging into Docker Hub"
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
-  artifacts:
-    paths:
-      - docker_image.tar
-    when: on_success
-    expire_in: 3 days
+    - echo "Building Docker image"
+    - docker build -t $IMAGE_TAG_SHORT -t $IMAGE_TAG_LATEST .
 
-docker_build:
-  stage: deploy
-  image: docker:latest
-  services:
-    - docker:dind
-  before_script:
-    - echo $CI_REGISTRY_PASSWORD | docker login -u $CI_REGISTRY_USER --password-stdin $CI_REGISTRY
+    - echo "Pushing Docker images to Docker Hub"
+    - docker push $IMAGE_TAG_SHORT
+    - docker push $IMAGE_TAG_LATEST
 
-  script:
-    - echo "Loading the docker image from tar file"
-    - docker load < docker_image.tar
-    - echo "Image loaded successfully"
-    - docker images
-    - IMAGE_ID=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep -v REPOSITORY | head -1)
-    - echo "Tagging image for GitLab registry"
-    - docker tag $IMAGE_ID $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
-    - docker tag $IMAGE_ID $CI_REGISTRY_IMAGE:latest
-    - echo "Pushing image to GitLab Container Registry"
-    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA
-    - docker push $CI_REGISTRY_IMAGE:latest
-    - ls -l 
-    - pwd
+    - echo "Saving Docker image as tar for downstream jobs"
+    - docker save $IMAGE_TAG_SHORT > docker_image.tar
 
   artifacts:
     paths:
@@ -93,4 +61,27 @@ docker_build:
 container_scanning:
   stage: scan
   variables:
-    CS_IMAGE: $CI_REGISTRY_IMAGE/$CI_REGISTRY_IMAGE:latest
+    CS_IMAGE: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest"
+  needs:
+    - docker_build_and_push
+
+deploy_to_gitlab_registry:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Logging into GitLab Container Registry"
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+
+    - echo "Loading Docker image from tar"
+    - docker load < docker_image.tar
+
+    - echo "Tagging image for GitLab registry"
+    - docker tag $IMAGE_TAG_LATEST $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker tag $IMAGE_TAG_LATEST $CI_REGISTRY_IMAGE:latest
+
+    - echo "Pushing image to GitLab Container Registry"
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $CI_REGISTRY_IMAGE:latest
+
