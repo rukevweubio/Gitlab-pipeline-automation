@@ -44,13 +44,14 @@ docker_deploy:
     - docker:dind
   before_script:
     - echo "Build the docker image to deploy the image"
-    - echo "Docker build the image and push it to Docker Hub"
-    - echo "$docker_password" | docker login -u "$docker_username" --password-stdin
-    - docker build -t $DOCKER_IMAGE .
-    - echo "The docker image built successfully"
-    - docker tag $DOCKER_IMAGE docker.io/$docker_username/$DOCKER_IMAGE:latest
-    - docker save $DOCKER_IMAGE > docker_image.tar
-    - echo "The docker image saved successfully"
+  script:
+      - echo "Docker build the image and push it to Docker Hub"
+      - echo "$docker_password" | docker login -u "$docker_username" --password-stdin
+      - docker build -t $DOCKER_IMAGE .
+      - echo "The docker image built successfully"
+      - docker tag $DOCKER_IMAGE docker.io/$docker_username/$DOCKER_IMAGE:latest
+      - docker save $DOCKER_IMAGE > docker_image.tar
+      - echo "The docker image saved successfully"
 
   artifacts:
     paths:
