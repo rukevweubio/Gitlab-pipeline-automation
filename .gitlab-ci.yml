@@ -22,6 +22,8 @@ test_job:
     - echo "Installing Node.js dependencies"
     - npm install
     - npm ci
+    - mv Node.js server.js
+
   script:
     - ls -l 
     - npm test
