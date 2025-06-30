@@ -21,9 +21,6 @@ variables:
 include:
   - template: Jobs/Container-Scanning.gitlab-ci.yml
 
-container_scanning:
-  variables:
-    CS_IMAGE: $CI_REGISTRY_IMAGE/$CI_COMMIT_SHORT_SHA
 
 test_job:
   stage: test
@@ -85,3 +82,8 @@ docker_build:
       - docker_image.tar
     when: on_success
     expire_in: 3 days
+
+container_scanning:
+  stage: scan
+  variables:
+    CS_IMAGE: $CI_REGISTRY_IMAGE/$CI_REGISTRY_IMAGE:latest
