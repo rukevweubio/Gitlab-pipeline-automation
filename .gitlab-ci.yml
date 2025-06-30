@@ -27,7 +27,8 @@ test_job:
   image: node:18
   before_script:
     - echo "Installing Node.js dependencies"
-    - mv Nodejs server.js
+    - ls -l 
+    - mv Node.js server.js
     - npm install
     - npm ci
 
