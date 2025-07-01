@@ -14,8 +14,6 @@ variables:
   DOCKER_REGISTRY: "docker.io"
   IMAGE_TAG_SHORT: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:$CI_COMMIT_SHORT_SHA"
   IMAGE_TAG_LATEST: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest"
-  DOCKER_USERNAME: $DOCKER_USERNAME
-  DOCKER_PASSWORD: $DOCKER_PASSWORD
 
 include:
   - template: 'Security/SAST.gitlab-ci.yml'
@@ -27,20 +25,19 @@ test_job:
   image: node:18
   before_script:
     - echo "Installing Node.js dependencies"
-    - ls -l 
-    - mv Node.js server.js || true 
-    - npm install
     - npm ci
   script:
-    - ls -l
+    - echo "Running tests"
     - npm test
+  cache:
+    paths:
+      - node_modules/
 
 docker_build_and_push:
   stage: build
   image: docker:latest
   services:
     - docker:dind
-
   variables:
     DOCKER_USERNAME: rukevweubio
     DOCKER_PASSWORD: Comfort12345@
@@ -63,6 +60,13 @@ docker_build_and_push:
       - docker_image.tar
     expire_in: 3 days
 
+container_scanning:
+  stage: scan
+  variables:
+    CS_IMAGE: "$IMAGE_TAG_SHORT"
+  needs:
+    - docker_build_and_push
+
 trivy_scan:
   stage: scan
   image: docker:latest
@@ -73,20 +77,13 @@ trivy_scan:
   before_script:
     - apk add --no-cache curl
     - mkdir -p bin && cd bin
-    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh  | sh
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
     - cd ..
   script:
     - export PATH="$(pwd)/bin:$PATH"
     - docker load < docker_image.tar
     - LOADED_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
     - trivy image --exit-code 0 --severity CRITICAL,HIGH $LOADED_IMAGE
-
-container_scanning:
-  stage: scan
-  variables:
-    CS_IMAGE: "$IMAGE_TAG_SHORT"
-  needs:
-    - docker_build_and_push
 
 deploy_to_gitlab_registry:
   stage: deploy
