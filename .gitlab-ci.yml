@@ -12,8 +12,8 @@ stages:
 variables:
   DOCKER_IMAGE_NAME: "nodejs-app"
   DOCKER_REGISTRY: "docker.io"
-  docker_username: Comfort12345@
-  docker_password: rukevweubio
+  DOCKER_USERNAME: rukevweubio
+  DOCKER_PASSWORD: Comfort12345@
   IMAGE_TAG_SHORT: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:$CI_COMMIT_SHORT_SHA"
   IMAGE_TAG_LATEST: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest"
 
@@ -40,7 +40,7 @@ docker_build_and_push:
     - docker:dind
   script:
     - echo "Logging into Docker Hub"
-    - echo "$docker_password" | docker login -u "$docker_username" --password-stdin
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
 
     - echo "Building Docker image"
     - docker build -t $IMAGE_TAG_SHORT -t $IMAGE_TAG_LATEST .
