@@ -25,9 +25,12 @@ test_job:
   image: node:18
   before_script:
     - echo "Installing Node.js dependencies"
+    - ls -l 
+    - mv Node.js server.js || true 
+    - npm install
     - npm ci
   script:
-    - echo "Running tests"
+    - ls -l
     - npm test
   cache:
     paths:
