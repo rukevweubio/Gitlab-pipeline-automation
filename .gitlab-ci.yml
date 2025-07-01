@@ -83,5 +83,9 @@ deploy_to_gitlab_registry:
 
     - echo "Pushing image to GitLab Container Registry"
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-    - docker push $CI_REGISTRY_IMAGE:latest
+    - ls -l 
+    - echo "the image is deploy to teh gitlab registry  sucessfully"
+    - pwd
+    
+   
 
