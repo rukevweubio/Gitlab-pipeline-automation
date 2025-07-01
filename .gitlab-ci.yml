@@ -14,6 +14,9 @@ variables:
   DOCKER_REGISTRY: "docker.io"
   IMAGE_TAG_SHORT: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:$CI_COMMIT_SHORT_SHA"
   IMAGE_TAG_LATEST: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest"
+  DOCKER_USERNAME: rukevweubio
+  DOCKER_PASSWORD: Comfort12345@
+
 
 include:
   - template: 'Security/SAST.gitlab-ci.yml'
@@ -66,7 +69,7 @@ docker_build_and_push:
 container_scanning:
   stage: scan
   variables:
-    CS_IMAGE: "$IMAGE_TAG_SHORT"
+    CS_IMAGE: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest"
   needs:
     - docker_build_and_push
 
@@ -83,7 +86,7 @@ trivy_scan:
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
     - cd ..
   script:
-    - export PATH="$(pwd)/bin:$PATH"
+    - export PATH="$(pwd)/bin/trivy"
     - docker load < docker_image.tar
     - LOADED_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
     - trivy image --exit-code 0 --severity CRITICAL,HIGH $LOADED_IMAGE
