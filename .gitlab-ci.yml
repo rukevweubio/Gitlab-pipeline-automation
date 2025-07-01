@@ -40,6 +40,10 @@ docker_build_and_push:
   image: docker:latest
   services:
     - docker:dind
+
+  variables:
+    DOCKER_USERNAME: rukevweubio
+    DOCKER_PASSWORD: Comfort12345@
   script:
     - echo "Logging into Docker Hub"
     - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
