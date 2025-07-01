@@ -73,6 +73,8 @@ trivy_scan:
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
   script:
     - docker load < $docker_image.tar
+    - docker images 
+    - ls -l
     - export PATH=$PATH:$(pwd)/bin
     - trivy --version
     - trivy image --exit-code 0 --severity CRITICAL,HIGH $DOCKER_IMAGE_NAME
