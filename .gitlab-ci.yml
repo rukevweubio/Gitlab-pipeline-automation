@@ -85,10 +85,9 @@ trivy_scan:
     - docker_build_and_push
   before_script:
     - apk add --no-cache curl
-    - mkdir -p bin && cd bin
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
-    - cd ..
-    - export PATH="$(pwd)/bin:$PATH"
+    #- docker load < $docker_image.tar
+    - export PATH=$PATH:$(pwd)/bin
     - trivy --version
   script:
     - echo "Loading Docker image from tar..."
