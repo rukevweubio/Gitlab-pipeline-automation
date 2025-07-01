@@ -78,6 +78,9 @@ trivy_scan:
   image: docker:latest
   services:
     - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_TLS_CERTDIR: ""
   needs:
     - docker_build_and_push
   before_script:
@@ -85,11 +88,16 @@ trivy_scan:
     - mkdir -p bin && cd bin
     - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
     - cd ..
+    - export PATH="$(pwd)/bin:$PATH"
+    - trivy --version
   script:
-    - export PATH="$(pwd)/bin/trivy"
+    - echo "Loading Docker image from tar..."
     - docker load < docker_image.tar
+    - echo "Detecting loaded image..."
     - LOADED_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
-    - trivy image --exit-code 0 --severity CRITICAL,HIGH $LOADED_IMAGE
+    - echo "Scanning $LOADED_IMAGE for vulnerabilities..."
+    - trivy image --exit-code 0 --severity CRITICAL,HIGH "$LOADED_IMAGE"
+
 
 deploy_to_gitlab_registry:
   stage: deploy
