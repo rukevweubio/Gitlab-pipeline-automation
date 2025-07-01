@@ -65,6 +65,31 @@ container_scanning:
   needs:
     - docker_build_and_push
 
+# deploy_to_gitlab_registry:
+#   stage: deploy
+#   image: docker:latest
+#   services:
+#     - docker:dind
+#   script:
+#     - echo "Logging into GitLab Container Registry"
+#     - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
+
+#     - echo "Loading Docker image from tar"
+#     - docker load < docker_image.tar
+#     - docker images
+#     - LOADED_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+
+#     - echo "Tagging image for GitLab registry"
+#     - docker tag $IMAGE_TAG_LATEST $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+#     - docker tag $IMAGE_TAG_LATEST $CI_REGISTRY_IMAGE:latest
+
+#     - echo "Pushing image to GitLab Container Registry"
+#     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+#     - ls -l 
+#     - echo "the image is deploy to teh gitlab registry  sucessfully"
+#     - pwd
+    
+   
 deploy_to_gitlab_registry:
   stage: deploy
   image: docker:latest
@@ -76,16 +101,15 @@ deploy_to_gitlab_registry:
 
     - echo "Loading Docker image from tar"
     - docker load < docker_image.tar
+    - docker images
 
-    - echo "Tagging image for GitLab registry"
-    - docker tag $IMAGE_TAG_LATEST $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-    - docker tag $IMAGE_TAG_LATEST $CI_REGISTRY_IMAGE:latest
+    - echo "Finding loaded image"
+    - LOADED_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+
+    - echo "Tagging for GitLab registry"
+    - docker tag $LOADED_IMAGE $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker tag $LOADED_IMAGE $CI_REGISTRY_IMAGE:latest
 
     - echo "Pushing image to GitLab Container Registry"
     - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
-    - ls -l 
-    - echo "the image is deploy to teh gitlab registry  sucessfully"
-    - pwd
-    
-   
-
+    - docker push $CI_REGISTRY_IMAGE:latest
