@@ -1,0 +1,122 @@
+workflow:
+  name: "Deploy a simple Node.js app to Docker Hub"
+  rules:
+    - if: '$CI_COMMIT_REF_NAME =~ /^feature/'
+
+stages:
+  - test
+  - build
+  - scan
+  - deploy
+
+variables:
+  DOCKER_IMAGE_NAME: "nodejs-app"
+  DOCKER_REGISTRY: "docker.io"
+  IMAGE_TAG_SHORT: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:$CI_COMMIT_SHORT_SHA"
+  IMAGE_TAG_LATEST: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest"
+  DOCKER_USERNAME: rukevweubio
+  DOCKER_PASSWORD: Comfort12345@
+
+
+include:
+  - template: 'Security/SAST.gitlab-ci.yml'
+  - template: 'Security/Secret-Detection.gitlab-ci.yml'
+  - template: 'Security/Container-Scanning.gitlab-ci.yml'
+
+test_job:
+  stage: test
+  image: node:18
+  before_script:
+    - echo "Installing Node.js dependencies"
+    - ls -l 
+    - mv Node.js server.js || true 
+    - npm install
+    - npm ci
+  script:
+    - ls -l
+    - npm test
+  cache:
+    paths:
+      - node_modules/
+
+docker_build_and_push:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_USERNAME: rukevweubio
+    DOCKER_PASSWORD: Comfort12345@
+  script:
+    - echo "Logging into Docker Hub"
+    - echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+
+    - echo "Building Docker image"
+    - docker build -t $IMAGE_TAG_SHORT -t $IMAGE_TAG_LATEST .
+
+    - echo "Pushing Docker images to Docker Hub"
+    - docker push $IMAGE_TAG_SHORT
+    - docker push $IMAGE_TAG_LATEST
+
+    - echo "Saving Docker image as tar for downstream jobs"
+    - docker save $IMAGE_TAG_SHORT > docker_image.tar
+
+  artifacts:
+    paths:
+      - docker_image.tar
+    expire_in: 3 days
+
+container_scanning:
+  stage: scan
+  variables:
+    CS_IMAGE: "$DOCKER_REGISTRY/$DOCKER_USERNAME/$DOCKER_IMAGE_NAME:latest"
+  needs:
+    - docker_build_and_push
+
+trivy_scan:
+  stage: scan
+  image: docker:latest
+  services:
+    - docker:dind
+  variables:
+    DOCKER_HOST: tcp://docker:2375/
+    DOCKER_TLS_CERTDIR: ""
+  needs:
+    - docker_build_and_push
+  before_script:
+    - apk add --no-cache curl
+    - curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh
+    #- docker load < $docker_image.tar
+    - export PATH=$PATH:$(pwd)/bin
+    - trivy --version
+  script:
+    - echo "Loading Docker image from tar..."
+    - docker load < docker_image.tar
+    - echo "Detecting loaded image..."
+    - LOADED_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+    - echo "Scanning $LOADED_IMAGE for vulnerabilities..."
+    - trivy image --exit-code 0 --severity CRITICAL,HIGH "$LOADED_IMAGE"
+
+
+deploy_to_gitlab_registry:
+  stage: deploy
+  image: docker:latest
+  services:
+    - docker:dind
+  script:
+    - echo "Logging into GitLab Container Registry"
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+
+    - echo "Loading Docker image from tar"
+    - docker load < docker_image.tar
+
+    - echo "Finding loaded image"
+    - LOADED_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | head -n 1)
+
+    - echo "Tagging for GitLab registry"
+    - docker tag $LOADED_IMAGE $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker tag $LOADED_IMAGE $CI_REGISTRY_IMAGE:latest
+
+    - echo "Pushing image to GitLab Container Registry"
+    - docker push $CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA
+    - docker push $CI_REGISTRY_IMAGE:latest
