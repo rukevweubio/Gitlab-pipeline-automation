@@ -1,4 +1,4 @@
-# build adn deploy containrization of nodejsapp
+# build and deploy containerization of NodeJS app
 
 
 
